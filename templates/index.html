@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Open Thai Chat Lab</title>
+  <script>
+    if (window.location.protocol === "file:") {
+      window.location.replace("http://127.0.0.1:5000/");
+    }
+  </script>
+  <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="%237c3aed"/><text x="32" y="42" text-anchor="middle" font-size="30" font-family="Arial" font-weight="700" fill="white">T</text></svg>' />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"></script>
+  <style>
+    /* ─── scrollbar ─── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+    /* ─── animations ─── */
+    @keyframes fadeSlideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .msg-enter { animation: fadeSlideIn 0.25s ease forwards; }
+    @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+    .cursor::after { content:"▋"; animation: blink 0.9s infinite; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+    .status-pill { animation: fadeIn .2s ease forwards; }
+
+    /* ─── theme variables ─── */
+    :root {
+      --bg:           #11131a;
+      --surface:      rgba(23,26,36,0.92);
+      --surface-soft: rgba(255,255,255,0.045);
+      --border:       rgba(255,255,255,0.09);
+      --text:         #f7f5ff;
+      --text-2:       #c6bfd8;
+      --text-3:       #8c849d;
+      --input-bg:     rgba(255,255,255,0.07);
+      --input-border: rgba(255,255,255,0.13);
+      --hover:        rgba(255,255,255,0.09);
+      --accent:       #7c3aed;
+      --accent-soft:  rgba(124,58,237,0.14);
+      --user-bubble:  #6d46d9;
+      --ai-bubble:    rgba(255,255,255,0.035);
+      --error-bg:     rgba(220,38,38,0.12);
+      --error-border: rgba(248,113,113,0.24);
+      --code-inline:  rgba(255,255,255,0.12);
+      --blockquote:   #b5aec7;
+      --th-bg:        #24283a;
+      --td-border:    #3a4052;
+      --modal-bg:     #1b1e2a;
+      --modal-overlay:rgba(9,10,15,0.62);
+      --soft-shadow:  0 18px 45px rgba(0,0,0,0.22);
+    }
+
+    .light {
+      --bg:           #f7f4ef;
+      --surface:      rgba(255,255,255,0.9);
+      --surface-soft: rgba(255,255,255,0.72);
+      --border:       rgba(74,64,94,0.12);
+      --text:         #221f2c;
+      --text-2:       #625a70;
+      --text-3:       #9a92a8;
+      --input-bg:     rgba(255,255,255,0.86);
+      --input-border: rgba(98,90,112,0.16);
+      --hover:        rgba(124,58,237,0.08);
+      --accent:       #7c3aed;
+      --accent-soft:  rgba(124,58,237,0.10);
+      --user-bubble:  #7451d6;
+      --ai-bubble:    rgba(255,255,255,0.68);
+      --error-bg:     rgba(254,226,226,0.82);
+      --error-border: rgba(248,113,113,0.32);
+      --code-inline:  rgba(124,58,237,0.09);
+      --blockquote:   #746b82;
+      --th-bg:        #eee8f8;
+      --td-border:    #ddd5e9;
+      --modal-bg:     #fffdf9;
+      --modal-overlay:rgba(35,28,45,0.32);
+      --soft-shadow:  0 18px 45px rgba(57,48,70,0.10);
+    }
+
+    body { background: var(--bg); color: var(--text); transition: background .2s, color .2s; }
+
+    header, .input-area {
+      background: var(--surface);
+      border-color: var(--border);
+      backdrop-filter: blur(12px);
+    }
+
+    #messages {
+      background:
+        radial-gradient(circle at top left, rgba(124,58,237,0.08), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(236,72,153,0.06), transparent 30rem);
+    }
+
+    .input-box {
+      background: var(--input-bg);
+      border-color: var(--input-border);
+      box-shadow: var(--soft-shadow);
+      transition: border-color .15s, background .15s, box-shadow .15s;
+    }
+    .input-box:focus-within { border-color: rgba(124,58,237,0.42); box-shadow: 0 18px 50px rgba(124,58,237,0.16); }
+
+    #user-input { resize:none; min-height:44px; max-height:180px; background:transparent; color:var(--text); }
+    #user-input::placeholder { color: var(--text-3); }
+
+    .btn-icon { color: var(--text-3); transition: color .15s, background .15s, transform .15s; border-radius: .75rem; }
+    .btn-icon:hover { color: var(--text); background: var(--hover); }
+    .btn-icon:active { transform: scale(.97); }
+
+    .mode-select {
+      height: 2.5rem;
+      max-width: 8rem;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--text-2);
+      border-radius: 999px;
+      padding: 0 .75rem;
+      font-size: .75rem;
+      outline: none;
+      transition: border-color .15s, background .15s, color .15s;
+    }
+    .mode-select:hover,
+    .mode-select:focus {
+      border-color: rgba(124,58,237,0.42);
+      background: var(--accent-soft);
+      color: var(--text);
+    }
+    .mode-select option {
+      background: var(--modal-bg);
+      color: var(--text);
+    }
+
+    .suggest-btn { background: var(--surface-soft); border-color: var(--border); color: var(--text-2); box-shadow: 0 10px 25px rgba(0,0,0,0.04); }
+    .suggest-btn:hover { border-color: rgba(124,58,237,0.28); background: var(--accent-soft); color: var(--text); transform: translateY(-1px); }
+
+    /* modal */
+    .modal-overlay { background: var(--modal-overlay); }
+    .modal-box { background: var(--modal-bg); border-color: var(--border); color: var(--text); box-shadow: var(--soft-shadow); }
+    .modal-input {
+      background: var(--input-bg);
+      border-color: var(--input-border);
+      color: var(--text);
+      transition: border-color .15s;
+    }
+    .modal-input::placeholder { color: var(--text-3); }
+    .modal-input:focus { border-color: rgba(139,92,246,0.5); outline: none; }
+
+    /* prose */
+    .prose { color: var(--text); }
+    .prose p { margin-bottom:.65rem; }
+    .prose p:last-child { margin-bottom:0; }
+    .prose ul,.prose ol { margin:.4rem 0 .65rem 1.25rem; }
+    .prose li { margin-bottom:.2rem; }
+    .prose code:not(pre code) {
+      background: var(--code-inline); padding:.1rem .35rem;
+      border-radius:.25rem; font-size:.875em;
+    }
+    .prose pre { margin:.6rem 0; border-radius:.6rem; overflow:hidden; }
+    .prose pre code { font-size:.82em; }
+    .code-block { margin:.6rem 0; border-radius:.6rem; overflow:hidden; }
+    .code-block pre { margin:0; border-radius:0; overflow:hidden; }
+    .code-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:.3rem .75rem; font-size:.72rem; font-family:monospace;
+      background:rgba(0,0,0,0.35);
+    }
+    .light .code-header { background:rgba(0,0,0,0.07); }
+    .code-lang { color:rgba(255,255,255,0.45); }
+    .light .code-lang { color:rgba(0,0,0,0.4); }
+    .copy-btn {
+      background:transparent; border:1px solid rgba(255,255,255,0.25);
+      color:rgba(255,255,255,0.55); border-radius:.3rem;
+      padding:.1rem .5rem; cursor:pointer; font-size:.7rem;
+      font-family:inherit; transition:all .15s;
+    }
+    .copy-btn:hover { background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.9); }
+    .copy-btn.copied { color:#4ade80; border-color:#4ade80; }
+    .light .copy-btn { border-color:rgba(0,0,0,0.2); color:rgba(0,0,0,0.45); }
+    .light .copy-btn:hover { background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.85); }
+    .light .copy-btn.copied { color:#16a34a; border-color:#16a34a; }
+    .prose h1{font-size:1.2rem;font-weight:700;margin:.9rem 0 .4rem}
+    .prose h2{font-size:1.05rem;font-weight:600;margin:.8rem 0 .35rem}
+    .prose h3{font-size:.95rem;font-weight:600;margin:.7rem 0 .3rem}
+    .prose blockquote{border-left:3px solid #6b7280;padding-left:.85rem;color:var(--blockquote);margin:.4rem 0}
+    .prose table{border-collapse:collapse;width:100%;margin:.65rem 0;font-size:.875rem}
+    .prose th,.prose td{border:1px solid var(--td-border);padding:.4rem .65rem}
+    .prose th{background:var(--th-bg)}
+    .prose a{color:#a78bfa;text-decoration:underline}
+    .prose hr{border-color:var(--td-border);margin:.75rem 0}
+    .prose strong{font-weight:600}
+
+    .brand-mark {
+      background: linear-gradient(135deg, #8b5cf6, #6d46d9 58%, #a855f7);
+      box-shadow: 0 12px 28px rgba(124,58,237,0.24);
+    }
+
+    .ai-card {
+      background: var(--ai-bubble);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: .85rem 1rem;
+    }
+
+    .light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+    .light ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden font-sans" id="app-body">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between px-4 sm:px-6 py-3 border-b flex-shrink-0">
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="brand-mark w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm text-white select-none">T</div>
+      <div class="min-w-0">
+        <div class="text-sm font-semibold leading-tight truncate">Open Thai Chat Lab</div>
+        <div class="hidden sm:block text-[11px] leading-tight mt-0.5" style="color:var(--text-3)">ผู้ช่วยภาษาไทยสำหรับงานประจำวัน</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <!-- API docs link -->
+      <a href="https://docs.opentyphoon.ai/en/"
+        target="_blank" rel="noopener"
+        class="btn-icon flex items-center gap-1.5 text-xs px-2.5 sm:px-3 py-2"
+        title="Typhoon Document">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5S19.832 5.477 21 6.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253"/>
+        </svg>
+        <span class="hidden sm:inline">Typhoon Document</span>
+      </a>
+
+      <!-- Theme toggle -->
+      <button onclick="toggleTheme()" title="สลับธีม"
+        class="btn-icon flex items-center gap-1.5 text-xs px-2.5 sm:px-3 py-2">
+        <svg id="icon-moon" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+        </svg>
+        <svg id="icon-sun" class="w-3.5 h-3.5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+        </svg>
+        <span id="theme-label" class="hidden sm:inline">Light</span>
+      </button>
+
+      <!-- Export chat -->
+      <button id="export-btn" onclick="exportChatMarkdown()" title="Export Chat เป็น Markdown" aria-label="Export Chat เป็น Markdown"
+        class="btn-icon flex items-center gap-1.5 text-xs px-2.5 sm:px-3 py-2 disabled:opacity-35 disabled:cursor-not-allowed" disabled>
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/>
+        </svg>
+        <span class="hidden sm:inline">Export</span>
+      </button>
+
+    </div>
+  </header>
+
+  <!-- Chat Panel -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <div id="messages" class="flex-1 overflow-y-auto">
+      <div id="msg-list" class="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-5">
+        <!-- Welcome (rendered by JS) -->
+      </div>
+    </div>
+
+    <!-- Input area -->
+    <div class="input-area flex-shrink-0 border-t px-4 py-4 sm:py-5">
+      <div class="max-w-3xl mx-auto">
+
+        <!-- Attachment preview -->
+        <div id="attach-preview" class="hidden flex items-center gap-2 mb-2">
+          <span class="flex items-center gap-1.5 text-xs rounded-xl px-3 py-1.5" style="background:var(--accent-soft);border:1px solid rgba(124,58,237,0.24);color:var(--text-2)">
+            <span id="attach-icon">📄</span>
+            <span id="attach-name" class="max-w-[200px] truncate"></span>
+            <button onclick="clearAttachment()" class="ml-1 text-violet-400 hover:text-white transition-colors leading-none">✕</button>
+          </span>
+        </div>
+
+        <!-- YouTube preview -->
+        <div id="yt-preview" class="hidden flex items-center gap-2 mb-2">
+          <span class="flex items-center gap-1.5 text-xs rounded-xl px-3 py-1.5" style="background:rgba(239,68,68,0.10);border:1px solid rgba(248,113,113,0.22);color:var(--text-2)">
+            📺 YouTube: <span id="yt-vid-id" class="font-mono"></span>
+          </span>
+        </div>
+
+        <div class="input-box flex items-end gap-2.5 border rounded-[1.35rem] px-3.5 py-3">
+          <button onclick="clearChat()" title="New Chat" aria-label="New Chat"
+            class="btn-icon group relative w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span class="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg px-2 py-1 text-[11px] opacity-0 shadow-lg transition-opacity group-hover:opacity-100"
+              style="background:var(--modal-bg);border:1px solid var(--border);color:var(--text)">
+              New Chat
+            </span>
+          </button>
+
+          <button onclick="document.getElementById('attach-file').click()" title="แนบไฟล์"
+            class="btn-icon w-10 h-10 flex items-center justify-center flex-shrink-0 mb-0.5">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+            </svg>
+          </button>
+          <input id="attach-file" type="file" accept=".png,.jpg,.jpeg,.pdf,.wav,.mp3,.flac,.ogg,.opus" class="hidden" onchange="onFileSelected(this)"/>
+
+          <select id="model-mode" class="mode-select flex-shrink-0 mb-0.5" title="เลือกโหมดของ Typhoon" aria-label="เลือกโหมดของ Typhoon">
+            <option value="fast">Fast</option>
+            <option value="thinking">Thinking</option>
+          </select>
+
+          <textarea id="user-input"
+            placeholder="พิมพ์ข้อความ หรือวาง YouTube URL... (Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่)"
+            class="flex-1 outline-none text-sm leading-6 pt-2"
+            rows="1" onkeydown="handleKey(event)" oninput="onInputChange()"></textarea>
+
+          <button id="send-btn" onclick="send()"
+            class="w-10 h-10 rounded-2xl bg-violet-600 hover:bg-violet-500 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-all flex-shrink-0 shadow-lg shadow-violet-900/25 text-white">
+            <svg id="send-icon" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/>
+            </svg>
+            <svg id="stop-icon" class="w-4 h-4 hidden" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2"/>
+            </svg>
+          </button>
+        </div>
+
+        <p class="text-center text-[14px] mt-3 leading-relaxed" style="color:var(--text-3)">
+          Reference: <a href="https://opentyphoon.ai" target="_blank" rel="noopener"
+            class="hover:underline" style="color:var(--text-2)">Typhoon Model</a> by SCB 10X
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    marked.use({ breaks: true, gfm: true });
+
+    /* ─── state ─── */
+    let history      = [];
+    let exportLog    = [];
+    let streaming    = false;
+    let abortCtrl    = null;
+    let attachedFile = null;
+
+    /* ─── DOM refs ─── */
+    const msgsEl   = document.getElementById("messages");
+    const listEl   = document.getElementById("msg-list");
+    const inputEl  = document.getElementById("user-input");
+    const sendBtn  = document.getElementById("send-btn");
+    const sendIcon = document.getElementById("send-icon");
+    const stopIcon = document.getElementById("stop-icon");
+    const modelModeEl = document.getElementById("model-mode");
+    const exportBtn = document.getElementById("export-btn");
+
+    /* ─── helpers ─── */
+    function scrollBottom() { msgsEl.scrollTop = msgsEl.scrollHeight; }
+    function autoResize(el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 180) + "px"; }
+    function handleKey(e)   { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }
+    function escHtml(s)     { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+    function renderMd(t) {
+      const html = DOMPurify.sanitize(marked.parse(t || ""));
+      return html.replace(/<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g, (_, attrs, code) => {
+        const m = attrs.match(/class="language-([^"]+)"/);
+        const lang = m ? escHtml(m[1]) : '';
+        const label = lang ? `<span class="code-lang">${lang}</span>` : '<span></span>';
+        return `<div class="code-block"><div class="code-header">${label}<button class="copy-btn">Copy</button></div><pre><code${attrs}>${code}</code></pre></div>`;
+      });
+    }
+    function highlightAll(el) { el.querySelectorAll("pre code:not(.hljs)").forEach(b => hljs.highlightElement(b)); }
+
+    listEl.addEventListener('click', e => {
+      const btn = e.target.closest('.copy-btn');
+      if (!btn) return;
+      const code = btn.closest('.code-block')?.querySelector('code');
+      if (!code) return;
+      navigator.clipboard.writeText(code.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+      });
+    });
+    function pad2(n) { return String(n).padStart(2, "0"); }
+    function formatLocalDate(d) {
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    }
+    function makeExportFilename(d) {
+      return `openthai-chat-${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}.md`;
+    }
+    function updateExportButton() {
+      exportBtn.disabled = exportLog.length === 0;
+    }
+
+    /* ─── theme ─── */
+    function applyTheme(light) {
+      document.getElementById("app-body").classList.toggle("light", light);
+      document.getElementById("icon-moon").classList.toggle("hidden", light);
+      document.getElementById("icon-sun").classList.toggle("hidden", !light);
+      document.getElementById("theme-label").textContent = light ? "Light" : "Dark";
+      document.getElementById("hljs-theme").href = light
+        ? "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css"
+        : "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css";
+    }
+    function toggleTheme() {
+      const isLight = !document.getElementById("app-body").classList.contains("light");
+      applyTheme(isLight);
+      localStorage.setItem("theme", isLight ? "light" : "dark");
+    }
+    function initTheme() {
+      const savedTheme = localStorage.getItem("theme");
+      if (savedTheme === "light" || savedTheme === "dark") {
+        applyTheme(savedTheme === "light");
+        return;
+      }
+      applyTheme(window.matchMedia("(prefers-color-scheme: light)").matches);
+    }
+
+    /* ─── file attachment ─── */
+    function onFileSelected(input) {
+      const file = input.files[0];
+      if (!file) return;
+      attachedFile = file;
+      const isAudio = file.type.startsWith("audio/");
+      document.getElementById("attach-icon").textContent = isAudio ? "🎤" : "📄";
+      document.getElementById("attach-name").textContent = file.name;
+      document.getElementById("attach-preview").classList.remove("hidden");
+      input.value = "";
+    }
+    function clearAttachment() {
+      attachedFile = null;
+      document.getElementById("attach-preview").classList.add("hidden");
+    }
+
+    /* ─── markdown export ─── */
+    function buildChatMarkdown() {
+      const exportedAt = new Date();
+      const parts = [
+        "# Open Thai AI Chat",
+        "",
+        `Exported: ${formatLocalDate(exportedAt)}`,
+        "",
+        "---",
+      ];
+
+      exportLog.forEach((item) => {
+        parts.push("");
+        parts.push(`## ${item.role === "user" ? "User" : "Assistant"}`);
+        parts.push("");
+        parts.push(`Time: ${formatLocalDate(new Date(item.createdAt))}`);
+        if (item.fileName) {
+          parts.push("");
+          parts.push(`Attachment: ${item.fileName}`);
+        }
+        parts.push("");
+        parts.push((item.content || "").trim() || "_ไม่มีข้อความ_");
+      });
+
+      parts.push("");
+      return parts.join("\n");
+    }
+
+    function exportChatMarkdown() {
+      if (!exportLog.length) return;
+      const now = new Date();
+      const blob = new Blob([buildChatMarkdown()], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = makeExportFilename(now);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    /* ─── YouTube detection ─── */
+    const YT_RE_JS = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w\-]{11})/;
+    function onInputChange() {
+      autoResize(inputEl);
+      const m = inputEl.value.match(YT_RE_JS);
+      if (m) {
+        document.getElementById("yt-vid-id").textContent = m[1];
+        document.getElementById("yt-preview").classList.remove("hidden");
+      } else {
+        document.getElementById("yt-preview").classList.add("hidden");
+      }
+    }
+
+    /* ─── pipeline status ─── */
+    const STATUS_TEXT = {
+      ocr_start:   "📄 กำลังอ่านข้อความจากไฟล์...",
+      ocr_progress: null,
+      ocr_wait:     null,
+      ocr_done:    "✓ อ่านข้อความเสร็จแล้ว",
+      asr_start:   "🎤 กำลังถอดความเสียง...",
+      asr_done:    "✓ ถอดความเสร็จแล้ว",
+      yt_start:    "📺 กำลังดึง YouTube transcript...",
+      yt_done:     "✓ ดึง YouTube transcript เสร็จแล้ว",
+      yt_dl_start: "📥 ไม่พบ transcript · กำลังดาวน์โหลดเสียงจาก YouTube...",
+      news_start:  "📰 กำลังดึงข่าวล่าสุด...",
+      news_done:   "✓ ดึงข่าวเสร็จแล้ว",
+      url_fetch_start: "🌐 กำลังดาวน์โหลดไฟล์จาก URL...",
+    };
+    function addPipelineStatus() {
+      const el = document.createElement("div");
+      el.className = "flex flex-col gap-1 mt-2 mb-1 px-1";
+      listEl.appendChild(el);
+      scrollBottom();
+      return el;
+    }
+    function updatePipelineStatus(statusEl, data) {
+      if (!(data.status in STATUS_TEXT)) return;
+      const pill = document.createElement("div");
+      pill.className = "status-pill flex items-center gap-1.5 text-[11px] pl-11";
+      pill.style.color = "var(--text-3)";
+      pill.textContent = data.message || STATUS_TEXT[data.status];
+      statusEl.appendChild(pill);
+      scrollBottom();
+    }
+
+    /* ─── welcome screen ─── */
+    function getWelcomeHTML() {
+      return `
+        <div id="welcome" class="text-center py-12 sm:py-16 select-none">
+          <div class="brand-mark w-20 h-20 rounded-[1.4rem] flex items-center justify-center text-3xl font-bold mx-auto mb-5 text-white">T</div>
+          <h2 class="text-2xl sm:text-3xl font-semibold mb-2">พร้อมช่วยคิด ช่วยเขียน ช่วยสรุป</h2>
+          <p class="text-sm mb-2" style="color:var(--text-2)">คุยภาษาไทยได้เป็นธรรมชาติ แนบไฟล์หรือวาง YouTube ได้ทันที</p>
+          <p class="text-xs mb-8" style="color:var(--text-3)">เลือกตัวอย่างด้านล่าง หรือพิมพ์สิ่งที่อยากให้ช่วยได้เลย</p>
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 max-w-4xl mx-auto">
+            <button onclick="suggest('ช่วยเขียนโค้ด HTML, CSS และ JavaScript สำหรับเว็บไซต์ Portfolio แนะนำตัวเองสำหรับสายงาน Data Analyst ให้ดูทันสมัยและเป็นมืออาชีพ โดยมี section สำหรับประวัติย่อ ทักษะ ผลงาน และช่องทางติดต่อด้วย')"
+              class="suggest-btn text-left p-4 rounded-2xl border transition-all text-sm group">
+              <span class="text-lg block mb-1.5">💻</span>
+              <span class="group-hover:text-violet-400 transition-colors font-medium">เขียนเว็บ Profile</span>
+              <span class="block text-xs mt-1" style="color:var(--text-3)">Portfolio สายงาน Data Analyst ดูเป็นมืออาชีพ</span>
+            </button>
+            <button onclick="suggest('สมมติคุณเป็น Senior Data Analyst ที่มีประสบการณ์สูง ช่วยอธิบายกระบวนการวิเคราะห์ข้อมูลลูกค้าตั้งแต่ต้นจนจบ ครอบคลุมตั้งแต่ Data Cleaning, EDA, Customer Segmentation ไปจนถึงการนำ Insight ไปใช้ตัดสินใจทางธุรกิจ พร้อมระบุ Tools และ Techniques ที่เหมาะสมด้วย')"
+              class="suggest-btn text-left p-4 rounded-2xl border transition-all text-sm group">
+              <span class="text-lg block mb-1.5">📊</span>
+              <span class="group-hover:text-violet-400 transition-colors font-medium">วิเคราะห์ข้อมูลเชิงลึก</span>
+              <span class="block text-xs mt-1" style="color:var(--text-3)">กระบวนการ Data Analysis ฉบับ Senior Analyst</span>
+            </button>
+            <button onclick="suggest('ในฐานะที่คุณเป็นผู้เชี่ยวชาญและชำนาญการด้าน HR ช่วยเขียนจดหมายลางาน ส่งให้หัวหน้าที่ให้ลางานยากและไม่ค่อยยอมให้ลา ขอให้ใช้ภาษาสุภาพ มีเหตุผลที่น่าเชื่อถือ และมีโอกาสลางานสำเร็จสูงที่สุด')"
+              class="suggest-btn text-left p-4 rounded-2xl border transition-all text-sm group">
+              <span class="text-lg block mb-1.5">✉️</span>
+              <span class="group-hover:text-violet-400 transition-colors font-medium">จดหมายลางาน</span>
+              <span class="block text-xs mt-1" style="color:var(--text-3)">ร่างโดย HR Expert โอกาสสำเร็จสูง</span>
+            </button>
+            <button onclick="suggest('ช่วยแปลย่อหน้าต่อไปนี้จากภาษาอังกฤษเป็นภาษาไทยให้เป็นธรรมชาติ รักษาน้ำเสียงและความหมายเดิมไว้ให้ครบถ้วนด้วย:\\n\\nRed Ball on the Floor\\nThe ball is on the floor. It is a red ball. It is a rubber ball. The baby looks at the ball. The cat looks at the ball. The cat is black. The cat walks over to the ball. The cat hits the ball with its paw. The ball rolls on the floor. The baby smiles.')"
+              class="suggest-btn text-left p-4 rounded-2xl border transition-all text-sm group">
+              <span class="text-lg block mb-1.5">🌐</span>
+              <span class="group-hover:text-violet-400 transition-colors font-medium">แปลภาษา</span>
+              <span class="block text-xs mt-1" style="color:var(--text-3)">แปลอังกฤษ → ไทย รักษาน้ำเสียงเดิม</span>
+            </button>
+            <button onclick="suggest('สรุปข่าวที่น่าสนใจและสำคัญวันนี้ให้หน่อยครับ')"
+              class="suggest-btn text-left p-4 rounded-2xl border transition-all text-sm group">
+              <span class="text-lg block mb-1.5">📰</span>
+              <span class="group-hover:text-violet-400 transition-colors font-medium">สรุปข่าววันนี้</span>
+              <span class="block text-xs mt-1" style="color:var(--text-3)">ดึงข่าวล่าสุดมาสรุปให้อ่านง่าย</span>
+            </button>
+            <button onclick="suggest('https://www.youtube.com/watch?v=rSO7gZRDrOM&amp;t=3s ช่วยสรุปเนื้อหาในวิดีโอนี้ให้ครบถ้วน พร้อมระบุประเด็นสำคัญและ key takeaways ที่นำไปใช้ได้จริง')"
+              class="suggest-btn text-left p-4 rounded-2xl border transition-all text-sm group">
+              <span class="text-lg block mb-1.5">▶️</span>
+              <span class="group-hover:text-violet-400 transition-colors font-medium">สรุปวิดีโอ YouTube</span>
+              <span class="block text-xs mt-1" style="color:var(--text-3)">วิเคราะห์เนื้อหาและ Key Takeaways</span>
+            </button>
+            <button onclick="suggest('ถอดข้อความทั้งหมดจากรูปภาพในลิงค์นี้ให้ครบถ้วน แล้วสรุปใจความสำคัญด้วย: https://www.popteen-shoes.com/wp-content/uploads/2021/05/1.png')"
+              class="suggest-btn text-left p-4 rounded-2xl border transition-all text-sm group">
+              <span class="text-lg block mb-1.5">🖼️</span>
+              <span class="group-hover:text-violet-400 transition-colors font-medium">ถอดข้อความจากรูป</span>
+              <span class="block text-xs mt-1" style="color:var(--text-3)">OCR อ่านข้อความจากรูปภาพ URL</span>
+            </button>
+            <button onclick="suggest('สรุปเนื้อหาสำคัญจากเอกสาร PDF ในลิงค์นี้ให้ครบถ้วนและเข้าใจง่าย พร้อมระบุประเด็นหลักที่ควรรู้: https://lib.doe.go.th/ebookdoc/020400003832_2.pdf')"
+              class="suggest-btn text-left p-4 rounded-2xl border transition-all text-sm group">
+              <span class="text-lg block mb-1.5">📄</span>
+              <span class="group-hover:text-violet-400 transition-colors font-medium">สรุปเอกสาร PDF</span>
+              <span class="block text-xs mt-1" style="color:var(--text-3)">ดึง PDF จาก URL แล้วสรุปให้</span>
+            </button>
+          </div>
+        </div>`;
+    }
+
+    /* ─── chat messages ─── */
+    function removeWelcome() { const w = document.getElementById("welcome"); if (w) w.remove(); }
+
+    function addUserMsg(text, fileName) {
+      removeWelcome();
+      const wrap = document.createElement("div");
+      wrap.className = "msg-enter flex justify-end mt-6";
+      const fileChip = fileName
+        ? `<div class="flex items-center gap-1 text-xs bg-white/15 rounded-xl px-2.5 py-1 mb-2 w-fit">📄 ${escHtml(fileName)}</div>`
+        : "";
+      wrap.innerHTML = `<div class="max-w-[86%] sm:max-w-[74%]"><div class="text-white text-sm px-4 py-3 rounded-3xl rounded-tr-lg leading-relaxed whitespace-pre-wrap break-words shadow-lg shadow-violet-900/10" style="background:var(--user-bubble)">${fileChip}${escHtml(text)}</div></div>`;
+      listEl.appendChild(wrap);
+      scrollBottom();
+    }
+
+    function addAiMsg() {
+      removeWelcome();
+      const wrap = document.createElement("div");
+      wrap.className = "msg-enter flex gap-3 mt-6";
+
+      const avatar = document.createElement("div");
+      avatar.className = "flex-shrink-0 flex flex-col items-center gap-0.5";
+
+      const avatarIcon = document.createElement("div");
+      avatarIcon.className = "brand-mark w-8 h-8 mt-0.5 rounded-2xl flex items-center justify-center text-xs font-bold text-white";
+      avatarIcon.textContent = "T";
+
+      const badge = document.createElement("div");
+      badge.className = "text-[9px] font-medium text-center";
+      badge.style.color = "var(--text-3)";
+      badge.textContent = "Typhoon";
+
+      avatar.appendChild(avatarIcon);
+      avatar.appendChild(badge);
+
+      const bubble = document.createElement("div");
+      bubble.className = "flex-1 min-w-0 flex flex-col gap-1.5";
+
+      const content = document.createElement("div");
+      content.className = "ai-card prose text-sm leading-relaxed cursor";
+
+      const meta = document.createElement("div");
+      meta.className = "text-[10px] hidden px-1";
+      meta.style.color = "var(--text-3)";
+
+      bubble.appendChild(content);
+      bubble.appendChild(meta);
+      wrap.appendChild(avatar);
+      wrap.appendChild(bubble);
+      listEl.appendChild(wrap);
+      scrollBottom();
+      return { content, meta, badge };
+    }
+
+    function addErrorMsg(msg) {
+      const wrap = document.createElement("div");
+      wrap.className = "msg-enter flex gap-3 mt-6";
+      wrap.innerHTML = `<div class="flex-shrink-0 w-8 h-8 mt-0.5 rounded-2xl bg-red-600 flex items-center justify-center text-xs font-bold text-white">!</div><div class="text-sm px-4 py-3 rounded-2xl border leading-relaxed" style="background:var(--error-bg);border-color:var(--error-border);color:var(--text)">${escHtml(msg)}</div>`;
+      listEl.appendChild(wrap);
+      scrollBottom();
+    }
+
+    /* ─── send ─── */
+    async function send() {
+      if (streaming) { stopStream(); return; }
+      const text = inputEl.value.trim();
+      if (!text && !attachedFile) return;
+
+      const fd = new FormData();
+      fd.append("message", text);
+      fd.append("history", JSON.stringify(history));
+      fd.append("model_mode", modelModeEl.value);
+      if (attachedFile) fd.append("file", attachedFile);
+
+      const capturedFile = attachedFile ? attachedFile.name : null;
+      inputEl.value = "";
+      inputEl.style.height = "auto";
+      clearAttachment();
+      document.getElementById("yt-preview").classList.add("hidden");
+      setStreaming(true);
+
+      history.push({ role: "user", content: text });
+      exportLog.push({ role: "user", content: text, fileName: capturedFile, createdAt: new Date().toISOString() });
+      updateExportButton();
+      addUserMsg(text, capturedFile);
+
+      const { content: contentEl, meta: metaEl, badge: badgeEl } = addAiMsg();
+      const statusEl = addPipelineStatus();
+      let accumulated = "";
+      abortCtrl = new AbortController();
+
+      try {
+        const res = await fetch("/smart-chat", {
+          method: "POST",
+          body: fd,
+          signal: abortCtrl.signal,
+        });
+        if (!res.ok) {
+          let detail = "";
+          try { detail = await res.text(); } catch { detail = ""; }
+          throw new Error(detail || `Request failed (${res.status})`);
+        }
+        if (!res.body) {
+          throw new Error("ไม่สามารถเปิด stream จาก server ได้");
+        }
+
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6);
+            if (raw === "[DONE]") continue;
+            try {
+              const p = JSON.parse(raw);
+              if (p.error) { if (statusEl.parentNode) statusEl.remove(); addErrorMsg(p.error); break; }
+              if (p.status) {
+                updatePipelineStatus(statusEl, p);
+                if (p.status === "routing") { badgeEl.textContent = "Typhoon"; }
+              }
+              if (p.content) {
+                if (statusEl.parentNode) statusEl.remove();
+                accumulated += p.content;
+                contentEl.innerHTML = renderMd(accumulated);
+                highlightAll(contentEl);
+                scrollBottom();
+              }
+              if (p.usage) {
+                metaEl.textContent = `prompt: ${p.usage.prompt_tokens} · completion: ${p.usage.completion_tokens} · total: ${p.usage.total_tokens} tokens`;
+                metaEl.classList.remove("hidden");
+              }
+            } catch { /* skip malformed */ }
+          }
+        }
+      } catch(e) {
+        if (e.name !== "AbortError") addErrorMsg(e.message);
+      } finally {
+        if (statusEl.parentNode) statusEl.remove();
+        contentEl.classList.remove("cursor");
+        if (accumulated) {
+          history.push({ role: "assistant", content: accumulated });
+          exportLog.push({ role: "assistant", content: accumulated, createdAt: new Date().toISOString() });
+          updateExportButton();
+        }
+        setStreaming(false);
+        inputEl.focus();
+      }
+    }
+
+    function stopStream() { if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; } }
+    function setStreaming(val) {
+      streaming = val;
+      sendBtn.disabled = false;
+      sendIcon.classList.toggle("hidden", val);
+      stopIcon.classList.toggle("hidden", !val);
+    }
+    function suggest(text) { inputEl.value = text; autoResize(inputEl); send(); }
+    function clearChat() {
+      if (streaming) stopStream();
+      history = [];
+      exportLog = [];
+      listEl.innerHTML = getWelcomeHTML();
+      updateExportButton();
+      inputEl.focus();
+    }
+
+    /* ─── init ─── */
+    window.addEventListener("load", () => {
+      listEl.innerHTML = getWelcomeHTML();
+      inputEl.focus();
+      initTheme();
+      updateExportButton();
+    });
+  </script>
+</body>
+</html>
