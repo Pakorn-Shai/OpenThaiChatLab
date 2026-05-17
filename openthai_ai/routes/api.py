@@ -8,7 +8,12 @@ from ..constants import FAST_MODEL, MODELS, OCR_BATCH_SIZE, POWER_MODEL, SYSTEM_
 from ..services.asr import normalize_asr_mime, transcribe_with_asr_api, validate_asr_upload
 from ..services.chat import classify_complexity, stream_chat_completion
 from ..services.files import detect_file_type
-from ..services.news import CATEGORIES as NEWS_CATEGORIES, detect_category, fetch_news, format_news_context, is_news_query
+from ..services.news import (
+    extract_news_request,
+    fetch_news_search,
+    format_news_search_context,
+    is_news_query,
+)
 from ..services.ocr import iter_ocr_events, run_ocr
 from ..services.url_fetch import UrlFile, extract_ocr_url, fetch_url_file, strip_url
 from ..services.security import resolve_api_key
@@ -99,11 +104,19 @@ def smart_chat():
     history = _parse_history(request.form.get("history", "[]"))
     file_obj = request.files.get("file")
     model_mode = request.form.get("model_mode", "fast")
+    app_mode = request.form.get("mode", "chat")
 
     def generate():
         try:
             api_key = resolve_api_key()
-            yield from _generate_smart_chat(message, history, file_obj, api_key, model_mode)
+            yield from _generate_smart_chat(
+                message,
+                history,
+                file_obj,
+                api_key,
+                model_mode,
+                app_mode,
+            )
         except Exception as exc:
             current_app.logger.exception("Smart chat request failed")
             yield sse_event({"error": str(exc)})
@@ -113,7 +126,14 @@ def smart_chat():
     return _sse_response(generate())
 
 
-def _generate_smart_chat(message, history, file_obj, api_key, model_mode="fast"):
+def _generate_smart_chat(
+    message,
+    history,
+    file_obj,
+    api_key,
+    model_mode="fast",
+    app_mode="chat",
+):
     context_text = ""
     context_label = "เนื้อหาที่ดึงมา"
     has_ocr = False
@@ -153,10 +173,12 @@ def _generate_smart_chat(message, history, file_obj, api_key, model_mode="fast")
         _ext = os.path.splitext(ocr_url.split('?')[0])[1].lower()
         context_label = "ข้อความจากเอกสาร PDF" if _ext == '.pdf' else "ข้อความจากรูปภาพ"
         has_ocr = True
-    elif is_news_query(message):
-        category = detect_category(message)
-        context_text = yield from _handle_news(category)
-        context_label = f"ข่าว{NEWS_CATEGORIES[category]['label']}ล่าสุดจาก Google News"
+    elif app_mode == "news" or is_news_query(message):
+        news_request = extract_news_request(message)
+        context_text = yield from _handle_news(news_request)
+        if context_text is None:
+            return
+        context_label = f"ข่าวจาก Google News RSS ภาษาไทย: {news_request.label}"
 
     assembled = _assemble_prompt(context_label, context_text, clean_msg)
     chosen = _choose_model(model_mode, assembled, has_ocr, has_asr, len(history))
@@ -226,17 +248,27 @@ def _handle_asr_upload(file_obj, mime, api_key):
     return transcript.text
 
 
-def _handle_news(category):
-    label = NEWS_CATEGORIES[category]["label"]
-    yield sse_event({"status": "news_start", "message": f"📰 กำลังดึงข่าว{label}ล่าสุด..."})
+def _handle_news(news_request):
+    yield sse_event({
+        "status": "news_start",
+        "message": f"📰 กำลังค้นและเปิดอ่านข่าวไทย: {news_request.label}...",
+    })
     try:
-        articles = fetch_news(category)
-        context = format_news_context(category, articles)
-        yield sse_event({"status": "news_done", "message": f"✓ ดึงข่าว{label} {len(articles)} รายการ"})
+        articles = fetch_news_search(news_request)
+        if not articles:
+            yield sse_event({
+                "error": "ไม่พบข่าวที่ตรงกับคำค้น ลองเปลี่ยนคำค้นให้กว้างขึ้น"
+            })
+            return None
+        context = format_news_search_context(news_request, articles)
+        yield sse_event({
+            "status": "news_done",
+            "message": f"✓ ดึงข่าว {news_request.label} {len(articles)} รายการ",
+        })
         return context
     except Exception as exc:
         yield sse_event({"error": f"ดึงข่าวไม่สำเร็จ: {exc}"})
-        return ""
+        return None
 
 
 def _handle_url_ocr(url, api_key):

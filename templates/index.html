@@ -135,6 +135,37 @@
       color: var(--text);
     }
 
+    .news-toggle {
+      height: 2.5rem;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.94);
+      color: #2b2436;
+      border-radius: 999px;
+      padding: 0 .85rem;
+      font-size: .75rem;
+      font-weight: 650;
+      transition: border-color .15s, background .15s, color .15s, transform .15s;
+    }
+    .news-toggle:hover {
+      border-color: rgba(124,58,237,0.34);
+      transform: translateY(-1px);
+    }
+    .news-toggle.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(124,58,237,0.22);
+    }
+    .light .news-toggle:not(.active) {
+      background: #fff;
+      color: #2b2436;
+    }
+
+    .locale-select {
+      width: 3.75rem;
+      padding: 0 .6rem;
+    }
+
     .suggest-btn { background: var(--surface-soft); border-color: var(--border); color: var(--text-2); box-shadow: 0 10px 25px rgba(0,0,0,0.04); }
     .suggest-btn:hover { border-color: rgba(124,58,237,0.28); background: var(--accent-soft); color: var(--text); transform: translateY(-1px); }
 
@@ -285,7 +316,7 @@
           </span>
         </div>
 
-        <div class="input-box flex items-end gap-2.5 border rounded-[1.35rem] px-3.5 py-3">
+        <div class="input-box flex flex-wrap sm:flex-nowrap items-end gap-2.5 border rounded-[1.35rem] px-3.5 py-3">
           <button onclick="clearChat()" title="New Chat" aria-label="New Chat"
             class="btn-icon group relative w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mb-0.5">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4">
@@ -311,9 +342,14 @@
             <option value="thinking">Thinking</option>
           </select>
 
+          <button id="news-toggle" type="button" onclick="toggleNewsMode()" title="News Mode" aria-label="เปิด News Mode" aria-pressed="false"
+            class="news-toggle flex-shrink-0 mb-0.5">
+            News
+          </button>
+
           <textarea id="user-input"
             placeholder="พิมพ์ข้อความ หรือวาง YouTube URL... (Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่)"
-            class="flex-1 outline-none text-sm leading-6 pt-2"
+            class="flex-1 min-w-[12rem] outline-none text-sm leading-6 pt-2"
             rows="1" onkeydown="handleKey(event)" oninput="onInputChange()"></textarea>
 
           <button id="send-btn" onclick="send()"
@@ -344,6 +380,7 @@
     let streaming    = false;
     let abortCtrl    = null;
     let attachedFile = null;
+    let chatMode     = "chat";
 
     /* ─── DOM refs ─── */
     const msgsEl   = document.getElementById("messages");
@@ -353,13 +390,29 @@
     const sendIcon = document.getElementById("send-icon");
     const stopIcon = document.getElementById("stop-icon");
     const modelModeEl = document.getElementById("model-mode");
+    const newsToggleEl = document.getElementById("news-toggle");
     const exportBtn = document.getElementById("export-btn");
+
+    const CHAT_PLACEHOLDER = "พิมพ์ข้อความ หรือวาง YouTube URL... (Enter ส่ง · Shift+Enter ขึ้นบรรทัดใหม่)";
+    const NEWS_PLACEHOLDER = "พิมพ์หัวข้อข่าว เช่น ข่าวร้อน เทคโนโลยี AI ราคาทอง หุ้น Apple OpenAI";
 
     /* ─── helpers ─── */
     function scrollBottom() { msgsEl.scrollTop = msgsEl.scrollHeight; }
     function autoResize(el) { el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 180) + "px"; }
     function handleKey(e)   { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }
     function escHtml(s)     { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+    function toggleNewsMode() {
+      chatMode = chatMode === "news" ? "chat" : "news";
+      updateInputMode();
+      inputEl.focus();
+    }
+    function updateInputMode() {
+      const isNews = chatMode === "news";
+      inputEl.placeholder = isNews ? NEWS_PLACEHOLDER : CHAT_PLACEHOLDER;
+      newsToggleEl.classList.toggle("active", isNews);
+      newsToggleEl.setAttribute("aria-pressed", String(isNews));
+      newsToggleEl.setAttribute("aria-label", isNews ? "ปิด News Mode" : "เปิด News Mode");
+    }
     function renderMd(t) {
       const html = DOMPurify.sanitize(marked.parse(t || ""));
       return html.replace(/<pre><code([^>]*)>([\s\S]*?)<\/code><\/pre>/g, (_, attrs, code) => {
@@ -553,7 +606,7 @@
               <span class="group-hover:text-violet-400 transition-colors font-medium">แปลภาษา</span>
               <span class="block text-xs mt-1" style="color:var(--text-3)">แปลอังกฤษ → ไทย รักษาน้ำเสียงเดิม</span>
             </button>
-            <button onclick="suggest('สรุปข่าวที่น่าสนใจและสำคัญวันนี้ให้หน่อยครับ')"
+            <button onclick="suggest('ข่าว')"
               class="suggest-btn text-left p-4 rounded-2xl border transition-all text-sm group">
               <span class="text-lg block mb-1.5">📰</span>
               <span class="group-hover:text-violet-400 transition-colors font-medium">สรุปข่าววันนี้</span>
@@ -653,6 +706,7 @@
       fd.append("message", text);
       fd.append("history", JSON.stringify(history));
       fd.append("model_mode", modelModeEl.value);
+      fd.append("mode", chatMode);
       if (attachedFile) fd.append("file", attachedFile);
 
       const capturedFile = attachedFile ? attachedFile.name : null;
@@ -761,6 +815,7 @@
       inputEl.focus();
       initTheme();
       updateExportButton();
+      updateInputMode();
     });
   </script>
 </body>
